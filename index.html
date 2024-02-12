@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Verlet test</title>
+	<meta charset="UTF-8" />
+</head>
+<body>
+	<div id="header">
+		<h1> <em>Shapes</em> </h1>
+	</div>
+	<canvas id="scratch" style="width: 800px; height: 500px;"> </canvas>
+
+<script type="module">
+
+import * as AngleConstraint from './src/constraint-angle.js'
+import * as Composite  from './src/composite.js'
+import * as DistanceConstraint from './src/constraint-distance.js'
+import * as DrawCanvas from './src/DrawCanvas.js'
+import * as Objects    from './src/objects.js'
+import * as Particle    from './src/particle.js'
+import * as VerletJS   from './src/verlet.js'
+import { vec2 }        from 'https://cdn.skypack.dev/gl-matrix'
+
+
+const canvas = document.getElementById("scratch")
+
+// canvas dimensions
+const width = parseInt(canvas.style.width)
+const height = parseInt(canvas.style.height)
+
+// retina
+const dpr = window.devicePixelRatio || 1
+canvas.width = width*dpr
+canvas.height = height*dpr
+canvas.getContext("2d").scale(dpr, dpr)
+
+// simulation
+const sim = VerletJS.create(width, height, canvas)
+sim.friction = 1
+
+
+// entities
+const segment = Objects.lineSegments([ vec2.fromValues(20,10),
+	                                   vec2.fromValues(40,10),
+	                                   vec2.fromValues(60,10),
+	                                   vec2.fromValues(80,10),
+	                                   vec2.fromValues(100,10)], 0.02)
+
+Composite.pin(segment, 0)
+Composite.pin(segment, 4)
+sim.composites.push(segment)
+
+const tire1 = Objects.tire(vec2.fromValues(200,50), 50, 30, 0.3, 0.9)
+const tire2 = Objects.tire(vec2.fromValues(400,50), 70, 7, 0.1, 0.2)
+const tire3 = Objects.tire(vec2.fromValues(600,50), 70, 3, 1, 1)
+
+sim.composites.push(tire1)
+sim.composites.push(tire2)
+sim.composites.push(tire3)
+
+
+// testing angle constraint
+const swingSt = Composite.create()
+const parent = Particle.create([ 500, 100 ])
+const ch = Particle.create([ 500, 120 ])
+const a = Particle.create([ 550, 120 ])
+swingSt.particles.push(parent)
+swingSt.particles.push(ch)
+swingSt.particles.push(a)
+
+Composite.pin(swingSt, 0)
+Composite.pin(swingSt, 1)
+
+const jointStrength = 0.95
+swingSt.constraints.push(AngleConstraint.create(parent, ch, a, jointStrength))
+swingSt.constraints.push(DistanceConstraint.create(parent, ch, 1.0))
+swingSt.constraints.push(DistanceConstraint.create(ch, a, 0.5))
+
+sim.composites.push(swingSt)
+
+
+function loop () {
+	VerletJS.frame(sim, 16)
+	DrawCanvas.verlet(sim)
+	requestAnimationFrame(loop)
+}
+
+requestAnimationFrame(loop)
+
+
+
+// prevent context menu
+canvas.oncontextmenu = function (e) {
+	e.preventDefault()
+}
+
+canvas.onmousedown = function (e) {
+	sim.mouseDown = true
+	const nearest = VerletJS.nearestEntity(sim)
+	if (nearest)
+		sim.draggedEntity = nearest
+}
+
+canvas.onmouseup = function (e) {
+	sim.mouseDown = false
+	sim.draggedEntity = null
+}
+
+canvas.onmousemove = function (e) {
+	const rect = canvas.getBoundingClientRect()
+	sim.mouse[0] = e.clientX - rect.left
+	sim.mouse[1] = e.clientY - rect.top
+};
+
+
+</script>
+</body>
